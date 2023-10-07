@@ -1,0 +1,17 @@
+{
+  "name": "Sept23_Granary_Strategy",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:0xBcamp/Sept23_Granary_Strategy.git",
+  "author": "anmol <anmolpokhrel46@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "prettier": "prettier --write 'src/**/*.sol'"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-foundry": "^1.1.1",
+    "hardhat": "^2.18.0",
+    "prettier": "^3.0.3",
+    "prettier-plugin-solidity": "^1.1.3"
+  }
+}
