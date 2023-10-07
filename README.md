@@ -1,1 +1,1 @@
-# Sept23_Granary_Strategy
+# Maxi Gain strategy
