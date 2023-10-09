@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.19;
+pragma solidity ^0.8.20;
 
 import "./interfaces/IStrategy.sol";
 import "openzeppelin/access/Ownable.sol";
-import "openzeppelin/security/ReentrancyGuard.sol";
+import "openzeppelin/utils/ReentrancyGuard.sol";
 import "openzeppelin/token/ERC20/ERC20.sol";
 import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
@@ -58,6 +58,7 @@ contract MaxiVault is ERC20, Ownable, ReentrancyGuard {
      */
     constructor(address _token, string memory _name, string memory _symbol, uint256 _depositFee, uint256 _tvlCap)
         ERC20(string(_name), string(_symbol))
+        Ownable(msg.sender)
     {
         token = IERC20(_token);
         constructionTime = block.timestamp;
