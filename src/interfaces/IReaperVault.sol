@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 interface IReaperVault {
     function asset() external view returns (address assetTokenAddress);
-
+    function balanceOf(address account) external view returns (uint256 balance);
     function totalAssets() external view returns (uint256 totalManagedAssets);
 
     function convertToShares(uint256 assets) external view returns (uint256 shares);
