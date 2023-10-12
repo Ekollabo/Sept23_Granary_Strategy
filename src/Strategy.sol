@@ -13,6 +13,7 @@ import {IStrategy} from "./interfaces/IStrategy.sol";
 import {IReaperVault} from "./interfaces/IReaperVault.sol";
 import {IMaxiVault} from "./interfaces/IMaxiVault.sol";
 import {console2} from "forge-std/console2.sol";
+import {Math} from "openzeppelin/utils/math/Math.sol";
 
 interface IERC20Extented is IERC20 {
     function decimals() external view returns (uint8);
@@ -65,27 +66,30 @@ contract Strategy is Ownable {
 
     function deposit() external {
         require(msg.sender == vault, "!vault");
-        _adjustPosition();
         _supplyAndBorrow();
         _depositToReaper();
     }
 
     function _supplyAndBorrow() internal {
-        uint256 wantBal = IERC20Extented(want).balanceOf(address(this));
+        uint256 wantBal = _balanceOfWant();
+        // console2.log("wantBal", wantBal);
         if (wantBal != 0) {
+            IERC20Extented(want).approve(lendingPool, wantBal);
             ILendingPool(lendingPool).deposit(want, wantBal, address(this), 0);
+            console2.log("Depsoited Amount", wantBal);
             uint256 borrowAmount = _calculateBorrowAmount(wantBal); // get 50% of want in loanToken
+            console2.log("borrowAmount", borrowAmount);
             ILendingPool(lendingPool).borrow(loanToken, borrowAmount, 2, 0, address(this));
+            console2.log("Borrow success");
             uint256 healthFactor = _checkHealthFactor();
             if (healthFactor < MIN_HEALTH_FACTOR) {
-                //TODO: Adjust position
-                return;
+                _adjustPosition();
             }
         }
     }
 
     function _calculateBorrowAmount(uint256 _want) internal view returns (uint256) {
-        uint256 half = _want / 2;
+        uint256 half = _want / 2; //50%
         uint256 loanTokenAmount = _convertToLoanToken(half);
         return loanTokenAmount;
     }
@@ -126,6 +130,7 @@ contract Strategy is Ownable {
     function _adjustPosition() internal view {
         (uint256 supplyBal, uint256 borrowBal) = _userReserves(want);
         uint256 healthFactor = _checkHealthFactor();
+        console2.log("healthFactor", healthFactor);
         if (supplyBal == 0 && borrowBal == 0) {
             // No position
             // return;
@@ -148,9 +153,9 @@ contract Strategy is Ownable {
     /* ----------------------------- VIEW FUNCTIONS INTERNAL ----------------------------- */
     // return supply and borrow balance
     function _userReserves(address asset) internal view returns (uint256, uint256) {
-        (uint256 supplyAmount, uint256 fixedRateBorrowAmount, uint256 variableRateBorrowAmount,,,,,,) =
+        (uint256 supplyAmount,, uint256 variableRateBorrowAmount,,,,,,) =
             IDataProvider(dataProvider).getUserReserveData(asset, address(this));
-        return (supplyAmount, variableRateBorrowAmount + fixedRateBorrowAmount);
+        return (supplyAmount, variableRateBorrowAmount);
     }
 
     function _balanceOfPool() internal view returns (uint256) {
@@ -188,11 +193,13 @@ contract Strategy is Ownable {
     }
 
     function _convertToLoanToken(uint256 _wantAmount) internal view returns (uint256) {
-        uint256 decimals = 1e18 - IERC20Extented(want).decimals();
+        // NOTE:Not handling the case if loanToken is not 18 decimals
+        uint256 remainingDecimals = 18 - IERC20Extented(want).decimals();
+        uint256 decimals = 10 ** remainingDecimals;
 
         uint256 wantTokenPrice = IPriceOracle(priceOracle).getAssetPrice(want) * FEED_PRECISION; // covert to 18 decimals
-        uint256 loanTokenPrice = IPriceOracle(priceOracle).getAssetPrice(loanToken) * FEED_PRECISION; // covert to 18 decimals
 
+        uint256 loanTokenPrice = IPriceOracle(priceOracle).getAssetPrice(loanToken) * FEED_PRECISION; // covert to 18 decimals
         uint256 loanTokenAmount;
 
         if (decimals != 0) {
