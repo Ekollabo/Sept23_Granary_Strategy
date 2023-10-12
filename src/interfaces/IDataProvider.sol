@@ -22,4 +22,6 @@ interface IDataProvider {
             uint40 stableRateLastUpdated,
             bool usageAsCollateralEnabled
         );
+
+    function getTotalDebt(address asset) external view returns (uint256);
 }

@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {Ownable} from "openzeppelin/access/Ownable.sol";
-import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import {SafeERC20} from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {IDataProvider} from "./interfaces/IDataProvider.sol";
 import {IAaveIncentives} from "./interfaces/IAaveIncentives.sol";
 import {ILendingPool} from "./interfaces/ILendingPool.sol";
@@ -12,23 +12,28 @@ import {IPriceOracle} from "./interfaces/IPriceOracle.sol";
 import {IStrategy} from "./interfaces/IStrategy.sol";
 import {IReaperVault} from "./interfaces/IReaperVault.sol";
 import {IMaxiVault} from "./interfaces/IMaxiVault.sol";
+import {console2} from "forge-std/console2.sol";
+
+interface IERC20Extented is IERC20 {
+    function decimals() external view returns (uint8);
+}
 
 contract Strategy is Ownable {
-    using SafeERC20 for IERC20;
+    using SafeERC20 for IERC20Extented;
 
-    address payable public vault;
+    address public vault;
 
     // tokens used
-    IERC20 public want;
-    IERC20 public loanToken;
-    IERC20 public aToken;
+    address public want;
+    address public loanToken;
+    address public aToken;
     // Aave contracts
-    ILendingPool public lendingPool;
-    IDataProvider public dataProvider;
-    IAaveIncentives public aaveIncentives;
-    IPriceOracle public priceOracle;
+    address public lendingPool;
+    address public dataProvider;
+    address public aaveIncentives;
+    address public priceOracle;
     //Reaper contracts
-    IReaperVault public reaperVault;
+    address public reaperVault;
 
     //Contants
     uint256 public constant PRECISION = 100;
@@ -40,35 +45,33 @@ contract Strategy is Ownable {
         address _vault,
         address _want,
         address _loanToken,
-        address _aToken,
         address _lendingPool,
         address _dataProvider,
         address _aaveIncentives,
         address _priceOracle,
         address _reaperVault
-    ) {
-        vault = IMaxiVault(payable(_vault));
-        want = IERC20(_want);
-        loanToken = IERC20(_loanToken);
-        lendingPool = ILendingPool(_lendingPool);
-        dataProvider = IDataProvider(_dataProvider);
-        aaveIncentives = IAaveIncentives(_aaveIncentives);
-        priceOracle = IPriceOracle(_priceOracle);
-        reaperVault = IReaperVault(_reaperVault);
+    ) Ownable(msg.sender) {
+        vault = _vault;
+        want = _want;
+        loanToken = _loanToken;
+        lendingPool = _lendingPool;
+        dataProvider = _dataProvider;
+        aaveIncentives = _aaveIncentives;
+        priceOracle = _priceOracle;
+        reaperVault = _reaperVault;
 
-        (_aToken,,) = IDataProvider(dataProvider).getReserveTokensAddresses(want);
-        aToken = IERC20(_aToken);
+        (aToken,,) = IDataProvider(dataProvider).getReserveTokensAddresses(address(want));
     }
 
     function deposit() external {
         require(msg.sender == vault, "!vault");
-        _monitorPositionAndAdjust();
+        _adjustPosition();
         _supplyAndBorrow();
         _depositToReaper();
     }
 
     function _supplyAndBorrow() internal {
-        uint256 wantBal = IERC20(want).balanceOf(address(this));
+        uint256 wantBal = IERC20Extented(want).balanceOf(address(this));
         if (wantBal != 0) {
             ILendingPool(lendingPool).deposit(want, wantBal, address(this), 0);
             uint256 borrowAmount = _calculateBorrowAmount(wantBal); // get 50% of want in loanToken
@@ -87,15 +90,16 @@ contract Strategy is Ownable {
         return loanTokenAmount;
     }
 
-    function _checkHealthFactor() internal view returns (uint256 healthFactor) {
-        (,,,,, uint256 healthFactor) = ILendingPool(lendingPool).getUserAccountData(address(this));
+    function _checkHealthFactor() internal view returns (uint256) {
+        (,,,,, uint256 _healthFactor) = ILendingPool(lendingPool).getUserAccountData(address(this));
+        return _healthFactor;
     }
 
     function _depositToReaper() internal {
-        uint256 loanTokenBal = loanToken.balanceOf(address(this));
+        uint256 loanTokenBal = IERC20Extented(loanToken).balanceOf(address(this));
         if (loanTokenBal != 0) {
-            loanToken.approve(reaperVault, loanTokenBal);
-            IReaperVault(reaperVault).deposit(loanTokenBal, address(this), address(this));
+            IERC20Extented(loanToken).approve(reaperVault, loanTokenBal);
+            IReaperVault(reaperVault).deposit(loanTokenBal, address(this));
         }
     }
 
@@ -104,39 +108,39 @@ contract Strategy is Ownable {
      */
     function withdraw(uint256 _amount) external {
         require(msg.sender == vault, "!vault");
-        _monitorPositionAndAdjust();
+        _adjustPosition();
         uint256 currBal = _balanceOfWant();
 
         if (currBal < _amount) {
             uint256 loanTokenAmountToWithdraw = _convertToLoanToken(_amount - currBal);
-            reaperVault.withdraw(loanTokenAmountToWithdraw, address(this), address(this));
-            lendingPool.repay(loanToken, loanTokenAmountToWithdraw, 2, address(this));
-            lendingPool.withdraw(want, _amount - currBal, address(this));
-            _monitorPositionAndAdjust();
+            IReaperVault(reaperVault).withdraw(loanTokenAmountToWithdraw, address(this), address(this));
+            ILendingPool(lendingPool).repay(loanToken, loanTokenAmountToWithdraw, 2, address(this));
+            ILendingPool(lendingPool).withdraw(want, _amount - currBal, address(this));
+            _adjustPosition();
         }
-        want.safeTransfer(vault, _amount);
+        IERC20Extented(want).safeTransfer(vault, _amount);
     }
 
     /* --------------------------- INTERNAL FUNCTIONS --------------------------- */
 
-    function _monitorPositionAndAdjust() internal {
+    function _adjustPosition() internal view {
         (uint256 supplyBal, uint256 borrowBal) = _userReserves(want);
         uint256 healthFactor = _checkHealthFactor();
         if (supplyBal == 0 && borrowBal == 0) {
             // No position
-            return;
+            // return;
         }
 
         if (supplyBal != 0 && borrowBal != 0) {
             // We have a position
             if (healthFactor < MIN_HEALTH_FACTOR) {
                 // get funds and repay some loan and check position again if it has increased or not
-                return;
+                // return;
             }
             if (healthFactor > MIN_HEALTH_FACTOR) {
                 // We have a profit
                 //May be we can take more loan and deposit to reaper
-                return;
+                // return;
             }
         }
     }
@@ -144,27 +148,29 @@ contract Strategy is Ownable {
     /* ----------------------------- VIEW FUNCTIONS INTERNAL ----------------------------- */
     // return supply and borrow balance
     function _userReserves(address asset) internal view returns (uint256, uint256) {
-        (uint256 supplyBal,, uint256 borrowBal,,,,,,) =
+        (uint256 supplyAmount, uint256 fixedRateBorrowAmount, uint256 variableRateBorrowAmount,,,,,,) =
             IDataProvider(dataProvider).getUserReserveData(asset, address(this));
-        return (supplyBal, borrowBal);
+        return (supplyAmount, variableRateBorrowAmount + fixedRateBorrowAmount);
     }
 
     function _balanceOfPool() internal view returns (uint256) {
-        (uint256 supplyBal, uint256 borrowBal) = _userReserves(want);
-        return supplyBal - borrowBal;
+        (uint256 supplyAmount, uint256 borrowAmount) = _userReserves(want);
+
+        return supplyAmount - borrowAmount;
     }
 
     function _debtInPool() internal view returns (uint256) {
-        (, uint256 borrowBal,,,,,,,) = _userReserves(loanToken);
-        return borrowBal;
+        ( /*uint256 supplyAmount*/ , uint256 borrowAmount) = _userReserves(loanToken);
+        return borrowAmount;
     }
 
     function _assetStakedInVault() internal view returns (uint256) {
-        return IReaperVault(reaperVault).convertToAssets(reaperVault.balanceOf(address(this)));
+        IReaperVault _reaperVault = IReaperVault(reaperVault);
+        return _reaperVault.convertToAssets(_reaperVault.balanceOf(address(this)));
     }
 
     function _balanceOfWant() internal view returns (uint256) {
-        return IERC20(want).balanceOf(address(this));
+        return IERC20Extented(want).balanceOf(address(this));
     }
 
     function _earned() internal view returns (uint256) {
@@ -182,7 +188,7 @@ contract Strategy is Ownable {
     }
 
     function _convertToLoanToken(uint256 _wantAmount) internal view returns (uint256) {
-        uint256 decimals = 1e18 - want.decimals();
+        uint256 decimals = 1e18 - IERC20Extented(want).decimals();
 
         uint256 wantTokenPrice = IPriceOracle(priceOracle).getAssetPrice(want) * FEED_PRECISION; // covert to 18 decimals
         uint256 loanTokenPrice = IPriceOracle(priceOracle).getAssetPrice(loanToken) * FEED_PRECISION; // covert to 18 decimals
@@ -203,7 +209,7 @@ contract Strategy is Ownable {
         return _balanceOfWant() + _balanceOfPool() + _earned();
     }
 
-    function monitorPositionAndAdjust() public view onlyOwner returns (uint256) {
-        return _monitorPositionAndAdjust();
+    function adjustPosition() public view onlyOwner {
+        _adjustPosition();
     }
 }
