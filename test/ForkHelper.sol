@@ -32,8 +32,8 @@ contract ForkHelper is Test {
         /* ---------------------------------- USERS --------------------------------- */
     address public user1 = address(0x1);
     address public user2 = address(0x2);
-    /* ---------------------------- CUSTOM CONTRACTS ---------------------------- */
 
+    uint256 public constant WBTC_CAP = 50e8;
     // setup
     MaxiVault public maxiVault;
     Strategy public strategy;
@@ -43,7 +43,7 @@ contract ForkHelper is Test {
         uint256 optimismFork = vm.createSelectFork(rpc, 110757864);
         assertEq(vm.activeFork(), optimismFork);
 
-        maxiVault = new MaxiVault(address(want), "MaxiVault WBTC", "mvWBTC", 0, 1e6 * 1e18); //1m
+        maxiVault = new MaxiVault(address(want), "MaxiVault WBTC", "mvWBTC", 0, WBTC_CAP); //50 WBTC cap
         strategy = new Strategy(
             address(maxiVault),
             address(want),
@@ -54,6 +54,8 @@ contract ForkHelper is Test {
             address(priceOracle),
             address(reaperVault)
         );
+        console2.log("MaxiVault deployed at: %s", address(maxiVault));
+        console2.log("Strategy deployed at: %s", address(strategy));
 
         maxiVault.initialize(address(strategy));
     }

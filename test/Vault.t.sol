@@ -8,15 +8,16 @@ import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 
 contract VaultTest is ForkHelper {
-    uint256 public constant DEPOSIT_AMT = 10 * 1e8;
+    uint256 public constant DEPOSIT_AMT = 10e8;
+    uint256 public constant PRECISION_DECIMALS = 1e10;
 
     function setUp() public override {
         super.setUp(); // setup the contracts and state
     }
 
     modifier fundUsers() {
-        deal(address(want), user1, 10e6 * 1e8, true);
-        deal(address(want), user2, 1000e8, true);
+        deal(address(want), user1, DEPOSIT_AMT, true); // fund user1 with 100 WBTC
+        deal(address(want), user2, DEPOSIT_AMT, true); // fund user2 with 10 WBTC
         _;
     }
     /* ------------------------------- CONSTRUCTOR ------------------------------ */
@@ -26,7 +27,7 @@ contract VaultTest is ForkHelper {
         assertEq(maxiVault.name(), "MaxiVault WBTC");
         assertEq(maxiVault.symbol(), "mvWBTC");
         assertEq(maxiVault.depositFee(), 0);
-        assertEq(maxiVault.tvlCap(), 1e6 * 1e8);
+        assertEq(maxiVault.tvlCap(), 50e8);
         assertEq(maxiVault.PERCENT_DIVISOR(), 10000);
         assertEq(maxiVault.initialized(), true);
         assertEq(maxiVault.balance(), 0);
@@ -40,9 +41,9 @@ contract VaultTest is ForkHelper {
 
     function test_shouldFailWhenDepositCapIsReached() public fundUsers {
         vm.startPrank(user1);
-        want.approve(address(maxiVault), 10e6 * 1e8);
+        want.approve(address(maxiVault), 60e8);
         vm.expectRevert("vault is full!");
-        maxiVault.deposit(10e6 * 1e8);
+        maxiVault.deposit(60e8);
         vm.stopPrank();
     }
 
@@ -54,11 +55,14 @@ contract VaultTest is ForkHelper {
         vm.stopPrank();
     }
 
-    function test_shouldIncreaseCummulativeDeposit() public {
-        vm.startPrank(user1);
+    function test_shouldIncreaseCummulativeDeposit() public fundUsers {
+        vm.startPrank(user1, user1); // set sender and origin to user1
+
         want.approve(address(maxiVault), DEPOSIT_AMT);
         maxiVault.deposit(DEPOSIT_AMT);
         assertEq(maxiVault.cumulativeDeposits(user1), DEPOSIT_AMT);
+        console2.log("cumulativeDeposits", maxiVault.cumulativeDeposits(user1));
+
         vm.stopPrank();
     }
 }
