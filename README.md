@@ -18,3 +18,19 @@ forge install
 ```
 forge test
 ```
+
+### Completed tasks
+
+- [x] setup vault contract
+- [x] deposit and borrow from aave successful
+- [x] Fork test environment setup
+- [x] Vault test for Deposit successful
+- [x] Handled want token decimals for deposit
+
+### TODO
+
+- [ ] Complete vault test
+- [ ] Maintain the collateral ratio to 200% while borrowing from aave
+- [ ] Monitor health factor on every deposit, if health factor is < 2e18 then calculate the amount which can be repaid to rise the health factor to 2e18. We are still not sure how much min health factor should we maintain.
+- [ ] Write test for strategy throughly
+- [ ] Monitor if there is loss in the startegy by subtracting ReaperDeposit - Debt = profit/loss. If loss what to do ?

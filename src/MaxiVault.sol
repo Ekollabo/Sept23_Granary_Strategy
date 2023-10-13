@@ -213,9 +213,6 @@ contract MaxiVault is ERC20, Ownable, ReentrancyGuard {
         uint256 initial = cumulativeDeposits[tx.origin];
         uint256 newTotal = initial + _amount;
         cumulativeDeposits[tx.origin] = newTotal;
-        console2.log("origin-", tx.origin);
-        console2.log("sender-", msg.sender);
-        console2.log("cumulativeDeposits-", cumulativeDeposits[tx.origin]);
         emit DepositsIncremented(tx.origin, _amount, newTotal);
         return true;
     }

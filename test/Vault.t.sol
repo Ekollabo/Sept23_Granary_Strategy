@@ -61,7 +61,6 @@ contract VaultTest is ForkHelper {
         want.approve(address(maxiVault), DEPOSIT_AMT);
         maxiVault.deposit(DEPOSIT_AMT);
         assertEq(maxiVault.cumulativeDeposits(user1), DEPOSIT_AMT);
-        console2.log("cumulativeDeposits", maxiVault.cumulativeDeposits(user1));
 
         vm.stopPrank();
     }

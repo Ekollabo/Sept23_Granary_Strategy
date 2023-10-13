@@ -82,6 +82,7 @@ contract Strategy is Ownable {
             ILendingPool(lendingPool).borrow(loanToken, borrowAmount, 2, 0, address(this));
             console2.log("Borrow success");
             uint256 healthFactor = _checkHealthFactor();
+            console2.log("healthFactor", healthFactor);
             if (healthFactor < MIN_HEALTH_FACTOR) {
                 _adjustPosition();
             }
@@ -89,8 +90,7 @@ contract Strategy is Ownable {
     }
 
     function _calculateBorrowAmount(uint256 _want) internal view returns (uint256) {
-        uint256 half = _want / 2; //50%
-        uint256 loanTokenAmount = _convertToLoanToken(half);
+        uint256 loanTokenAmount = _convertToLoanToken(_want);
         return loanTokenAmount;
     }
 
@@ -130,7 +130,6 @@ contract Strategy is Ownable {
     function _adjustPosition() internal view {
         (uint256 supplyBal, uint256 borrowBal) = _userReserves(want);
         uint256 healthFactor = _checkHealthFactor();
-        console2.log("healthFactor", healthFactor);
         if (supplyBal == 0 && borrowBal == 0) {
             // No position
             // return;
@@ -207,7 +206,7 @@ contract Strategy is Ownable {
         } else {
             loanTokenAmount = _wantAmount * wantTokenPrice / loanTokenPrice;
         }
-        return loanTokenAmount;
+        return loanTokenAmount / 2;
     }
 
     /* ------------------------------- PUBLIC VIEW FUNCTIONS ------------------------------ */
