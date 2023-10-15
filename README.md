@@ -1,6 +1,8 @@
-# Maxi Gain - Multi Assets Strategy
+# Maxi Gain - Multi Asset Strategy
 
-Maxi gain is a multi asset strategy which covert the base asset into asset with the high yield and deposit that to reaper vault.
+MaxiVault is a smart contract-based solution that provides users with a secure and flexible way to manage their funds in DeFi. It offers features such as depositing, earning, and withdrawing funds while implementing risk management controls, deposit fees, and TVL caps. This README provides an overview of the MaxiVault project, how to use it, and important details for developers and users.
+
+Maxi gain is a multi-asset strategy that converts the base asset into an asset with a high yield and deposits that into the reaper vault.
 
 ## Set up
 
